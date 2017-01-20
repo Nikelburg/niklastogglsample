@@ -1,0 +1,20 @@
+{
+  "name": "particleTogglButton",
+  "version": "1.0.0",
+  "description": "A Particle and Node powered Toggl button",
+  "main": "index.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/patcat/particleTogglButton"
+  },
+  "author": "Patrick Catanzariti",
+  "bugs": {
+    "url": "https://github.com/patcat/particleTogglButton/issues"
+  },
+  "homepage": "https://github.com/patcat/particleTogglButton",
+  "dependencies": {
+    "underscore": "^1.8.3",
+    "spark": "^1.0.0",
+    "toggl-api": "0.0.3"
+  }
+}
