@@ -15,16 +15,7 @@ function p(msg) { console.log(msg) }
 
 // guard variable to avoid calling Toggle twice on double click.
 var amSpeakingWithToggle = false
-
-function onSparkButtonPressed () {
-				console.log("Button was pressed!");
-				if (amSpeakingWithToggle) {
-					p("ignoring")
-					return
-				}
-				amSpeakingWithToggle = true
-
-        toggl.getCurrentTimeEntry(function(err, currentEntry) {
+function onToggleGetCurrentTime ( err, currentEntry) {
           if (currentEntry) {
             console.log(currentEntry.description + " is running");
 
@@ -64,8 +55,18 @@ console.log("!!!!!!!!!!!!!!!!!!")
               }
             });
           }
-        });
-			}
+        }
+
+function onSparkButtonPressed () {
+  p("Button was pressed!");
+  if (amSpeakingWithToggle) {
+    p("ignoring")
+    return
+  }
+
+  amSpeakingWithToggle = true
+  toggle.getCurrentTimeEntry( onToggleGetCurrentTime )
+}
 
 function onSparkLogin (err, body) {
   p("Particle device login successful: ", body)
