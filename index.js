@@ -4,11 +4,12 @@ var spark       = require("spark"),
 
 
 // TOGGL configuration
-const TOGGL_DEFAULT_WID  = 991369
-const TOGGL_DEFAULT_PID  = 29460565
-const TOGGL_DEFAULT_DESC = "Keine Schablone vorhanden"
-const TOGGL_TIMEFRAME    = 2 // number of days to look for a template entry
-const TOGGL_API_KEY      = "9c6752b7992e7d41f0b72f03c0951b35"
+const TOGGL_DEFAULT_WID    = 991369
+const TOGGL_DEFAULT_PID    = 29460565
+const TOGGL_DEFAULT_DESC   = "Keine Schablone vorhanden"
+const TOGGL_TIMEFRAME      = 2 // number of days to look for a template entry
+const TOGGL_API_KEY        = "9c6752b7992e7d41f0b72f03c0951b35"
+const TOGGL_QUERY_INTERVAL = 1000
 
 // SPARK / Particle config
 const MY_PARTICLE_NAME   = "TogglBitch"
@@ -16,7 +17,7 @@ const SPARK_ACCESS_TOKEN = "9ab9ba7bcddbaf84ff559ef0820a7c05ae9c46ff"
 
 
 // instatiate global toggle api client and particle.
-var toggl       = new TogglClient({apiToken: TOGGL_API_KEY}) 
+var toggl       = new TogglClient({apiToken: TOGGL_API_KEY}),
 	  currentParticle;
 
 
@@ -137,6 +138,18 @@ function onSparkLogin (err, body) {
 			
 }
 
+function initTogglQuery () {
+  toggl.getCurrentTimeEntry( (err, entry) => {
+    if (err) {
+      p(`error trying to query toggl: ${err}`)
+      return
+    }
+    p(entry)
+    if (entry) { led(true) } else { led(false) }
+    setTimeout(initTogglQuery, TOGGL_QUERY_INTERVAL)
+  } )
+
+}
 function initParticle() {
   spark.on("login", onSparkLogin);
 
@@ -145,6 +158,7 @@ function initParticle() {
   }, (err, body) => {
     if (!err) {
       p(`API login complete! ${JSON.stringify(body)}`)
+      initTogglQuery()
     } else {
       p("login failed: "+err)
     }
