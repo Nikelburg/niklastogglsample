@@ -2,70 +2,119 @@
 var spark       = require("spark"),
     TogglClient = require("toggl-api");
 
+
+// TOGGL configuration
+const TOGGL_DEFAULT_WID  = 991369
+const TOGGL_DEFAULT_PID  = 29460565
+const TOGGL_DEFAULT_DESC = "Keine Schablone vorhanden"
+const TOGGL_TIMEFRAME    = 2 // number of days to look for a template entry
+const TOGGL_API_KEY      = "9c6752b7992e7d41f0b72f03c0951b35"
+
+// SPARK / Particle config
+const MY_PARTICLE_NAME   = "TogglBitch"
+const SPARK_ACCESS_TOKEN = "9ab9ba7bcddbaf84ff559ef0820a7c05ae9c46ff"
+
+
 // instatiate global toggle api client and particle.
-var toggl       = new TogglClient({apiToken: "9c6752b7992e7d41f0b72f03c0951b35"}),
+var toggl       = new TogglClient({apiToken: TOGGL_API_KEY}) 
 	  currentParticle;
 
-const MY_PARTICLE_NAME = "TogglBitch"
-
-initParticle();
 
 // utility print function to save us some typing.
 function p(msg) { console.log(msg) }
 
+// utility function to turn led on or off.
+function led(onOff) {
+  currentParticle.callFunction("ledTrigger", onOff ? "ON" : "OFF", (result) => {
+    p(`LED should be ${ onOff ? "on" : "off"}`);
+  });
+}
+
+////////////////////////////////////////////////////////////////////////
+// Actual callbacks
+////////////////////////////////////////////////////////////////////////
+
 // guard variable to avoid calling Toggle twice on double click.
 var amSpeakingWithToggle = false
-function onToggleGetCurrentTime ( err, currentEntry) {
-          if (currentEntry) {
-            console.log(currentEntry.description + " is running");
 
-            toggl.stopTimeEntry(currentEntry.id, function(err, stoppedEntry) {
-              console.log(stoppedEntry.description + " was stopped");
-		amSpeakingWithToggle = false
+// get time entries retrieves the last few days worth of entries,
+// to use them as a template for a new entry. In case no previous entries
+// can be found, use default values ...
+function onTogglGetTimeEntries (err, entries) {
+  if (err) {
+    p(`could not retrieve template entries ${err}`)
+    amSpeakingWithToggle = false
+    return
+  }
+	
+  p(JSON.stringify( entries ))
+  var lastEntry = entries[entries.length - 1];
 
-              currentParticle.callFunction("ledTrigger", "OFF", function(result) {
-                console.log("LED should be off");
-              });
-            });
-          } else {
-            var currentDate = new Date(),
-                yesterday = new Date();
+  var timeEntry = {
+     description: TOGGL_DEFAULT_DESC
+    ,pid:         TOGGL_DEFAULT_PID
+    ,wid:         TOGGL_DEFAULT_WID
+  }
+  
+  // if we found an entry, use it as a template.
+  if (typeof lastEntry !== "undefined") {
+    timeEntry.description = lastEntry.description
+    timeEntry.pid         = lastEntry.pid
+    timeEntry.wid         = lastEntry.wid
+  }    
 
-            yesterday.setDate(currentDate.getDate() - 1);
-            
-            toggl.getTimeEntries(yesterday.toISOString(), currentDate.toISOString(), function(err, data) {
-              if (!err) {
-		p(JSON.stringify( data ))
-                var lastEntry = data[data.length - 1];
-console.log("!!!!!!!!!!!!!!!!!!")
-                console.log(typeof lastEntry);
-console.log("!!!!!!!!!!!!!!!!!!")
+  toggl.startTimeEntry( timeEntry , (err, newEntry) => {
+    p("Entry started");
+    // clear the guard condition, we're done talking to 
+    // Toggl, and are free to call the API again.
+    amSpeakingWithToggle = false
+    led(true)
+  });
+}
 
-                toggl.startTimeEntry({
-                  description: lastEntry.description,
-                  pid: lastEntry.pid,
-                  wid: lastEntry.wid
-                }, function(err, timeEntry) {
-                  console.log("Entry started");
-			amSpeakingWithToggle = false
-                  currentParticle.callFunction("ledTrigger", "ON", function(result) {
-                    console.log("LED should be on");
-                  });
-                });
-              }
-            });
-          }
-        }
+// checks whether a current toggl entry is accessible. If so,
+// stop the timer.
+function onToggleGetCurrentTimeEntry ( err, currentEntry) {
+  if (err) {
+    p(`An error occured talking to Toggl: ${err}`)
+    amSpeakingWithToggle = false
+    return
+  }
+  if (currentEntry) {
+    p(currentEntry.description + " is running. Will stop it.");
+
+    toggl.stopTimeEntry( currentEntry.id, (err, stoppedEntry) => {
+      if (err) {
+        p(`could not stop current entry: ${err}`)
+        return
+      }
+      p(stoppedEntry.description + " was stopped");
+      amSpeakingWithToggle = false
+      led(false)
+    });
+  } else {
+    // construct a new task.
+    var currentDate = new Date(),
+        yesterday   = new Date()
+        
+    yesterday.setDate(currentDate.getDate() - TOGGL_TIMEFRAME);
+  
+    p( `Trying to retrieve a template entry from between ${yesterday} and ${currentDate}`)
+    toggl.getTimeEntries(yesterday.toISOString(), currentDate.toISOString(), onTogglGetTimeEntries) // getTimeEntries
+  } // else
+} // onToggleGetCurrentTimeEntry
 
 function onSparkButtonPressed () {
   p("Button was pressed!");
+  // Communication with toggle is already taking place,
+  // wait until it's completed to start new communication.
   if (amSpeakingWithToggle) {
     p("ignoring")
     return
   }
 
   amSpeakingWithToggle = true
-  toggle.getCurrentTimeEntry( onToggleGetCurrentTime )
+  toggl.getCurrentTimeEntry( onToggleGetCurrentTimeEntry )
 }
 
 function onSparkLogin (err, body) {
@@ -92,7 +141,7 @@ function initParticle() {
   spark.on("login", onSparkLogin);
 
   spark.login({
-    accessToken: "9ab9ba7bcddbaf84ff559ef0820a7c05ae9c46ff"
+    accessToken: SPARK_ACCESS_TOKEN 
   }, (err, body) => {
     if (!err) {
       p(`API login complete! ${JSON.stringify(body)}`)
@@ -101,3 +150,6 @@ function initParticle() {
     }
   }) // end spark.login
 }
+
+
+initParticle();
